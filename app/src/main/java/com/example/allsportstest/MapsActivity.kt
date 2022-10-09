@@ -1,8 +1,10 @@
 package com.example.allsportstest
 
 
+import android.graphics.Point
 import android.os.Bundle
-import android.util.Log
+import android.util.DisplayMetrics
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -11,18 +13,26 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MarkerOptions
+import com.google.maps.android.SphericalUtil
 import com.google.maps.android.clustering.ClusterManager
 import kotlinx.coroutines.launch
 
-private const val START_LAT = 53.9
-private const val START_LNG = 27.5667
 
 class MapsActivity : AppCompatActivity(),
     OnMapReadyCallback {
 
-    private lateinit var mMap: GoogleMap
+    companion object {
+        private const val START_LAT = 53.9
+        private const val START_LNG = 27.5667
+        private const val DEFAULT_ZOOM = 14f
+        private const val DEFAULT_RADIUS_SEARCH = 1500.0
+    }
+
+    private lateinit var map: GoogleMap
     private lateinit var binding: ActivityMapsBinding
     private val mainViewModel: MainViewModel by viewModels()
 
@@ -34,84 +44,66 @@ class MapsActivity : AppCompatActivity(),
         setContentView(binding.root)
 
         lifecycleScope.launch {
-            mainViewModel.requestObject(this@MapsActivity, START_LAT, START_LNG)
+            mainViewModel.requestObject(
+                this@MapsActivity,
+                START_LAT,
+                START_LNG,
+                DEFAULT_RADIUS_SEARCH
+            )
+        }
+
+        mainViewModel.liveDataError.observe(this) {
+            if (it != null) {
+                Toast.makeText(this, it.toString(), Toast.LENGTH_SHORT).show()
+            }
         }
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
-
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
-        mMap = googleMap
-        addMarker(mMap)
+        map = googleMap
+        map.setInfoWindowAdapter(MarkerInfoWindowAdapter(this))
         val cameraPosition = CameraPosition.builder()
             .target(LatLng(START_LAT, START_LNG))
-            .zoom(14f)
+            .zoom(DEFAULT_ZOOM)
             .build()
         val cameraUpdate = CameraUpdateFactory.newCameraPosition(cameraPosition)
-        mMap.animateCamera(cameraUpdate)
+        map.animateCamera(cameraUpdate)
 
-
-        /**
-        without Customize markers
-         */
-//        mMap.setOnCameraIdleListener {
-//            lifecycleScope.launch {
-//                val center = mMap.cameraPosition.target
-//                Log.d("log", center.toString())
-//                mainViewModel.requestObject(this@MapsActivity, center.latitude, center.longitude)
-//            }
-//        }
-
-        googleMap.setInfoWindowAdapter(MarkerInfoWindowAdapter(this))
-
-
+        mainViewModel.liveDataListOfMapObj.observe(this) { list ->
+            addMarker(googleMap, list)
+        }
     }
 
-    private fun addMarker(googleMap: GoogleMap) {
-        mainViewModel.liveDataList.observe(this) { list ->
-            val clusterManager = ClusterManager<SearchedObject>(this, googleMap)
-            clusterManager.renderer =
-                ObjectRenderer(
-                    this,
-                    googleMap,
-                    clusterManager
-                )
-            clusterManager.markerCollection.setInfoWindowAdapter(MarkerInfoWindowAdapter(this))
-            clusterManager.addItems(list)
-            clusterManager.cluster()
-            googleMap.setOnCameraIdleListener {
-                lifecycleScope.launch {
-                    val center = googleMap.cameraPosition.target
-                    Log.d("log", center.toString())
-                    mainViewModel.requestObject(
-                        this@MapsActivity,
-                        center.latitude,
-                        center.longitude
-                    )
-                }
-                clusterManager.onCameraIdle()
-            }
+    private fun addMarker(
+        googleMap: GoogleMap,
+        markerList: List<MapObject>
+    ) {
+        markerList.forEach {
+            val marker = googleMap.addMarker(
+                MarkerOptions()
+                    .title(it.name)
+                    .position(LatLng(it.lat, it.lng))
+                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.icon_marker))
+            )
+            marker?.tag =it
+        }
 
-            /**
-            without Customize markers
-             */
-//            for (i in list.indices) {
-//                val cafe = list[i]
-//                val marker = LatLng(cafe.lat, cafe.lng)
-//                val addMarker = googleMap.addMarker(
-//                    MarkerOptions()
-//                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.icon_marker))
-//                        .position(marker)
-//                        .title(cafe.name)
-//                )
-//
-//                    addMarker!!.tag = cafe
-//
-//            }
+        googleMap.setOnCameraIdleListener {
+            lifecycleScope.launch {
+                val center = googleMap.cameraPosition.target
+                val fromCenterToTarget = searchRadius(center, googleMap)
+                mainViewModel.requestObject(
+                    this@MapsActivity,
+                    center.latitude,
+                    center.longitude,
+                    fromCenterToTarget
+                )
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">AllSportsTest</string>
     <string name="title_activity_maps">MapsActivity</string>
+    <string name="error_network">Ошибка соединения</string>
 </resources>

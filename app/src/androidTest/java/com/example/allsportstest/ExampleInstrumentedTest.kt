@@ -13,6 +13,8 @@ import org.junit.Assert.*
  *
  * See [testing documentation](http://d.android.com/tools/testing).
  */
+
+// Мелочь, но если тесты ты не писал, то и хранить пустые стандартные классы для тестов незачем. Каждый класс должен иметь цель. Так что папки test и androidTest можно удалить
 @RunWith(AndroidJUnit4::class)
 class ExampleInstrumentedTest {
     @Test

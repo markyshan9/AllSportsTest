@@ -29,6 +29,7 @@
              project's local.properties file (e.g. MAPS_API_KEY=Aiza...), and replace the
              "YOUR_API_KEY" string in this file with "${MAPS_API_KEY}".
         -->
+        <!-- У тебя в AndroidManifest лежит инструкция по билду (получить API ключ и подсунуть его в проперти). Если ревьювер не зайдет в манифест, то не сможет собрать проект. Это должно быть в readme. -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
